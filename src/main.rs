@@ -1,6 +1,7 @@
 use backoff::{retry, Error, ExponentialBackoff};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
+use spinners::{Spinner, Spinners};
 use std::process::exit;
 
 #[derive(Parser)]
@@ -28,12 +29,14 @@ fn main() {
 
     let current_commit = get_current_commit(&branch);
 
+    let mut spinner = Spinner::new(Spinners::Dots, "Waiting for GitHub".into());
     retry(ExponentialBackoff::default(), || {
         get_latest_commit(&branch)
             .filter(|latest_commit| &current_commit == latest_commit)
             .ok_or(Error::transient(()))
     })
     .expect("Failed to initialise exponential backoff");
+    spinner.stop_and_persist("✔", "GitHub is up to date".into())
 }
 
 fn get_current_branch() -> Option<String> {
@@ -56,9 +59,13 @@ fn get_current_commit(branch: &str) -> String {
         .args(["rev-parse", branch])
         .output()
         .expect("Failed to execute git rev-parse");
-    assert!(output.status.success());
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprint!("{}", stderr);
+        exit(1)
+    }
     let stdout = String::from_utf8_lossy(&output.stdout);
-    stdout.to_string()
+    stdout.trim().to_string()
 }
 
 fn get_latest_commit(branch: &str) -> Option<String> {
@@ -66,7 +73,11 @@ fn get_latest_commit(branch: &str) -> Option<String> {
         .args(["pr", "view", branch, "--json", "commits"])
         .output()
         .expect("Failed to execute gh pr view command");
-    assert!(output.status.success());
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprint!("{}", stderr);
+        exit(1)
+    }
     let stdout = String::from_utf8_lossy(&output.stdout);
     let pull_request: GitHubPullRequest =
         serde_json::from_str(&stdout).expect("Failed to parse PR JSON");
