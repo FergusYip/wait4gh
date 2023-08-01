@@ -1,7 +1,11 @@
 [package]
 name = "wait4gh"
+description = "Wait for GitHub to be in sync with the local repository"
 version = "0.1.0"
+authors = ["Fergus Yip"]
 edition = "2021"
+readme = "README.md"
+repository = "https://github.com/FergusYip/wait4gh"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
