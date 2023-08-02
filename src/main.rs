@@ -1,8 +1,9 @@
-use backoff::{retry, Error, ExponentialBackoff};
+use backoff::{retry, Error, ExponentialBackoffBuilder};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use spinners::{Spinner, Spinners};
 use std::process::exit;
+use std::time::Duration;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -30,12 +31,18 @@ fn main() {
     let current_commit = get_current_commit(&branch);
 
     let mut spinner = Spinner::new(Spinners::Dots, "Waiting for GitHub".into());
-    retry(ExponentialBackoff::default(), || {
+
+    let backoff = ExponentialBackoffBuilder::new()
+        .with_initial_interval(Duration::from_secs(1))
+        .build();
+
+    retry(backoff, || {
         get_latest_commit(&branch)
             .filter(|latest_commit| &current_commit == latest_commit)
             .ok_or(Error::transient(()))
     })
     .expect("Failed to initialise exponential backoff");
+
     spinner.stop_and_persist("✔", "GitHub is up to date".into())
 }
 
